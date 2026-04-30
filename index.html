@@ -99,6 +99,11 @@
         
         .cart-section { background: var(--brand-main); color: white; padding: 30px; border-radius: 20px; max-width: 700px; margin: 40px auto; border-top: 4px solid var(--brand-accent); }
         
+        /* Cupom Section */
+        .coupon-box { display: flex; gap: 10px; margin-top: 20px; }
+        .coupon-box input { margin-bottom: 0; text-transform: uppercase; }
+        .coupon-box button { width: auto; margin-top: 0; padding: 0 20px; }
+
         .payment-box { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(197, 160, 89, 0.4); padding: 20px; margin: 25px 0; text-align: center; border-radius: 12px; }
         .pix-key { display: block; background: rgba(255, 255, 255, 0.1); padding: 12px; margin: 10px 0; color: var(--brand-accent); border-radius: 8px; font-family: monospace; word-break: break-all; }
         .btn-copy { background: var(--brand-accent); color: var(--brand-main); border: none; padding: 10px 20px; cursor: pointer; font-weight: 700; border-radius: 6px; }
@@ -106,8 +111,7 @@
         .btn-action { background: var(--brand-accent); color: var(--brand-main); border: none; padding: 15px; width: 100%; font-weight: 700; cursor: pointer; text-transform: uppercase; border-radius: 8px; margin-top: 10px; }
         .btn-finalize { background: var(--success); color: white; border: none; padding: 15px; width: 100%; font-weight: 700; cursor: pointer; margin-top: 15px; border-radius: 8px; }
 
-        /* --- NOVAS MELHORIAS: TOAST E CARRINHO FLUTUANTE --- */
-        
+        /* Toast e Carrinho Flutuante */
         .toast {
             position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%);
             background: var(--success); color: white; padding: 12px 25px;
@@ -146,7 +150,10 @@
 </head>
 <body>
 
-<header><img src="NOVOLOGO.PNG" alt="Logo" class="logo"></header>
+<header>
+    <!-- Substitua logo3.png se tiver uma logo oficial que deseja mostrar -->
+    <img src="NOVOLOGO.PNG" alt="Logo" class="logo" onerror="this.style.display='none'">
+</header>
 
 <div id="toast" class="toast">✅ Item adicionado com sucesso!</div>
 
@@ -169,7 +176,20 @@
     <div id="checkout-section" class="cart-section">
         <h3 style="text-align: center; text-transform: uppercase;">Seu Carrinho</h3>
         <div id="lista-carrinho" style="margin-top: 15px;"></div>
-        <div style="text-align: right; margin: 20px 0; font-size: 1.2rem;">Total: <span id="total-carrinho" style="color: var(--brand-accent); font-weight: 800;">R$ 0,00</span></div>
+        
+        <!-- NOVA SESSÃO: Cupom de Desconto -->
+        <div class="coupon-box">
+            <input type="text" id="input-cupom" placeholder="CUPOM DE DESCONTO">
+            <button class="btn-action" onclick="aplicarCupom()">APLICAR</button>
+        </div>
+        <p id="msg-cupom" style="font-size: 0.85rem; margin-top: 5px; font-weight: 600; min-height: 1.2rem;"></p>
+
+        <!-- SESSÃO DE TOTAIS ATUALIZADA -->
+        <div style="text-align: right; margin: 20px 0; font-size: 1.2rem;">
+            <div id="div-subtotal" style="display: none; font-size: 1rem; color: #ccc;">Subtotal: <span id="subtotal-carrinho">R$ 0,00</span></div>
+            <div id="div-desconto" style="display: none; font-size: 1rem; color: var(--success); margin-bottom: 5px;">Desconto: <span id="desconto-carrinho">- R$ 0,00</span></div>
+            Total: <span id="total-carrinho" style="color: var(--brand-accent); font-weight: 800;">R$ 0,00</span>
+        </div>
         
         <div class="payment-box">
             <label style="color: white; margin-bottom: 10px; display: block;">Pague via PIX</label>
@@ -211,6 +231,17 @@ let carrinho = [];
 let categoriaAtual = 'tudo';
 let produtoSelecionadoAtual = "";
 
+// VARIÁVEIS DO CUPOM
+// Adicione ou altere cupons aqui: O valor representa o desconto (ex: 0.10 = 10%)
+const CUPONS_VALIDOS = {
+    'FIT10': 0.10,     // 10%
+    'PROMO15': 0.15,    // 15%
+    'CAMILLA20': 0.20  // 20%
+    
+};
+let descontoAtivo = 0;
+let nomeCupomAtivo = "";
+
 async function carregarDados() {
     try {
         const r = await fetch(URL);
@@ -222,7 +253,7 @@ async function carregarDados() {
             tag: row.c[6]?.v || "", vPromo: row.c[7]?.v || null 
         }));
         renderVitrine();
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("Erro ao carregar dados", err); }
 }
 
 function filtrarCategoria(cat, btn) {
@@ -372,7 +403,7 @@ function confirmarAdicao() {
         
         atualizarCarrinho();
         fecharModal();
-        mostrarToast(); // CHAMADA DO FEEDBACK VISUAL
+        mostrarToast(); 
     }
 }
 
@@ -402,6 +433,35 @@ function removerDoCarrinho(chave) {
     atualizarCarrinho();
 }
 
+// LOGICA DO CUPOM
+function aplicarCupom() {
+    const input = document.getElementById('input-cupom').value.toUpperCase().trim();
+    const msg = document.getElementById('msg-cupom');
+
+    if (input === "") {
+        descontoAtivo = 0;
+        nomeCupomAtivo = "";
+        msg.innerText = "Cupom removido.";
+        msg.style.color = "var(--white)";
+        atualizarCarrinho();
+        return;
+    }
+
+    if (CUPONS_VALIDOS[input]) {
+        descontoAtivo = CUPONS_VALIDOS[input];
+        nomeCupomAtivo = input;
+        msg.innerText = `✅ Cupom aplicado! (${descontoAtivo * 100}% OFF)`;
+        msg.style.color = "var(--success)";
+    } else {
+        descontoAtivo = 0;
+        nomeCupomAtivo = "";
+        msg.innerText = "❌ Cupom inválido ou expirado.";
+        msg.style.color = "var(--danger)";
+    }
+    
+    atualizarCarrinho();
+}
+
 function atualizarCarrinho() {
     const lista = document.getElementById('lista-carrinho');
     const floatCart = document.getElementById('floating-cart');
@@ -409,6 +469,9 @@ function atualizarCarrinho() {
     if (carrinho.length === 0) {
         lista.innerHTML = '<p style="text-align:center; opacity:0.6;">Seu carrinho está vazio.</p>';
         floatCart.style.display = 'none';
+        descontoAtivo = 0; // zera desconto se carrinho esvaziar
+        document.getElementById('input-cupom').value = '';
+        document.getElementById('msg-cupom').innerText = '';
     } else {
         lista.innerHTML = carrinho.map(i => `
             <div style="display:flex; flex-direction:column; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
@@ -429,10 +492,29 @@ function atualizarCarrinho() {
         floatCart.style.display = 'flex';
     }
 
-    const total = carrinho.reduce((a, b) => a + (b.vFinal * b.qtd), 0);
+    const subtotal = carrinho.reduce((a, b) => a + (b.vFinal * b.qtd), 0);
+    const valorDesconto = subtotal * descontoAtivo;
+    const totalFinal = subtotal - valorDesconto;
     const qtdTotal = carrinho.reduce((a, b) => a + b.qtd, 0);
     
-    const totalStr = `R$ ${total.toFixed(2).replace('.',',')}`;
+    const subtotalStr = `R$ ${subtotal.toFixed(2).replace('.',',')}`;
+    const descontoStr = `- R$ ${valorDesconto.toFixed(2).replace('.',',')}`;
+    const totalStr = `R$ ${totalFinal.toFixed(2).replace('.',',')}`;
+
+    // Atualiza visual do cupom/totais
+    const divSubtotal = document.getElementById('div-subtotal');
+    const divDesconto = document.getElementById('div-desconto');
+
+    if (descontoAtivo > 0 && carrinho.length > 0) {
+        divSubtotal.style.display = 'block';
+        divDesconto.style.display = 'block';
+        document.getElementById('subtotal-carrinho').innerText = subtotalStr;
+        document.getElementById('desconto-carrinho').innerText = descontoStr;
+    } else {
+        divSubtotal.style.display = 'none';
+        divDesconto.style.display = 'none';
+    }
+
     document.getElementById('total-carrinho').innerText = totalStr;
     
     // Atualiza o Carrinho Flutuante
@@ -451,9 +533,23 @@ function copiarPix() {
 function enviarPedido() {
     const nome = document.getElementById('nome_cliente').value;
     if(!nome || carrinho.length === 0) return alert("Preencha seu nome e adicione itens ao carrinho!");
+    
     const itens = carrinho.map(i => `- ${i.qtd}x ${i.p} (${i.t}/${i.c})`).join('%0A');
-    const total = document.getElementById('total-carrinho').innerText;
-    const msg = `Olá! Meu nome é ${nome}. Gostaria de confirmar o pedido:%0A%0A${itens}%0A%0A*Total: ${total}*`;
+    const totalFinalStr = document.getElementById('total-carrinho').innerText;
+    
+    let msg = `Olá! Meu nome é ${nome}. Gostaria de confirmar o pedido:%0A%0A${itens}%0A%0A`;
+    
+    // Se tiver cupom aplicado, envia no WhatsApp discriminado
+    if (descontoAtivo > 0) {
+        const subtotalStr = document.getElementById('subtotal-carrinho').innerText;
+        const descontoStr = document.getElementById('desconto-carrinho').innerText;
+        msg += `*Subtotal:* ${subtotalStr}%0A`;
+        msg += `*Cupom Aplicado:* ${nomeCupomAtivo} (${descontoAtivo * 100}% OFF)%0A`;
+        msg += `*Desconto:* ${descontoStr}%0A`;
+    }
+
+    msg += `*Total a Pagar:* ${totalFinalStr}`;
+    
     window.open(`https://wa.me/5513996526566?text=${msg}`, '_blank');
 }
 
